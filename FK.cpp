@@ -212,17 +212,42 @@ void FK::computeLocalAndGlobalTransforms(
   // Use the jointParents and jointUpdateOrder arrays to do so.
   // Also useful are the Mat3d and RigidTransform4d classes defined in the Vega folder.
 
+    for (int i = 0; i < localTransforms.size(); i++)
+    {
+        double anat_incorrect_localR[9];
+        euler2Rotation(jointOrientationEulerAngles[i], anat_incorrect_localR, rotateOrders[i]);
+
+        double joint_orient[9];
+        euler2Rotation(eulerAngles[i], joint_orient, rotateOrders[i]);
+
+        Mat3d anat_correct_localR = asMat3d(anat_incorrect_localR) * asMat3d(joint_orient);
+
+        localTransforms[i] = RigidTransform4d(anat_correct_localR, translations[i]);
+
+        int parent_i = jointParents[i];
+        if (parent_i >= 0)
+        {
+            globalTransforms[i] = globalTransforms[parent_i] * localTransforms[i];
+        }
+        else
+        {
+            globalTransforms[i] = localTransforms[i];
+        }
+    }
+
+
+
   // The following is just a dummy implementation that should be replaced.
-  double identity[16] = {
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1 };
-  for(int i=0; i<localTransforms.size(); i++)
-  {
-    localTransforms[i] = RigidTransform4d(identity);
-    globalTransforms[i] = RigidTransform4d(identity);
-  }
+  //double identity[16] = {
+  //  1, 0, 0, 0,
+  //  0, 1, 0, 0,
+  //  0, 0, 1, 0,
+  //  0, 0, 0, 1 };
+  //for(int i=0; i<localTransforms.size(); i++)
+  //{
+  //  localTransforms[i] = RigidTransform4d(identity);
+  //  globalTransforms[i] = RigidTransform4d(identity);
+  //}
 }
 
 // Compute skinning transformations for all the joints, using the formula:
