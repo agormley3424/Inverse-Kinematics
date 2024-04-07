@@ -234,20 +234,6 @@ void FK::computeLocalAndGlobalTransforms(
             globalTransforms[i] = localTransforms[i];
         }
     }
-
-
-
-  // The following is just a dummy implementation that should be replaced.
-  //double identity[16] = {
-  //  1, 0, 0, 0,
-  //  0, 1, 0, 0,
-  //  0, 0, 1, 0,
-  //  0, 0, 0, 1 };
-  //for(int i=0; i<localTransforms.size(); i++)
-  //{
-  //  localTransforms[i] = RigidTransform4d(identity);
-  //  globalTransforms[i] = RigidTransform4d(identity);
-  //}
 }
 
 // Compute skinning transformations for all the joints, using the formula:
@@ -259,16 +245,21 @@ void FK::computeSkinningTransforms(
 {
   // Students should implement this.
 
+    for (int i = 0; i < skinTransforms.size(); i++)
+    {
+        skinTransforms[i] = globalTransforms[i] * invRestGlobalTransforms[i];
+    }
+
   // The following is just a dummy implementation that should be replaced.
-  double identity[16] = {
-    1, 0, 0, 0,
-    0, 1, 0, 0,
-    0, 0, 1, 0,
-    0, 0, 0, 1 };
-  for(int i=0; i<skinTransforms.size(); i++)
-  {
-    skinTransforms[i] = RigidTransform4d(identity);
-  }
+  //double identity[16] = {
+  //  1, 0, 0, 0,
+  //  0, 1, 0, 0,
+  //  0, 0, 1, 0,
+  //  0, 0, 0, 1 };
+  //for(int i=0; i<skinTransforms.size(); i++)
+  //{
+  //  skinTransforms[i] = RigidTransform4d(identity);
+  //}
 }
 
 void FK::computeJointTransforms()
