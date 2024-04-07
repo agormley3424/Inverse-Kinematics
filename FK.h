@@ -95,7 +95,9 @@ public:
   // Get joint values in the current pose:
   Vec3d getJointGlobalPosition(int jointID) const { return jointGlobalTransforms[jointID].getTranslation(); }
   const RigidTransform4d & getJointGlobalTransform(int jointID) const { return jointGlobalTransforms[jointID]; }
-  const RigidTransform4d * getJointSkinTransforms() const { return jointSkinTransforms.data(); } // the transforms are used for skinning
+  const RigidTransform4d * getJointSkinTransforms() const {
+      return jointSkinTransforms.data();
+  } // the transforms are used for skinning
 
 protected:
   void buildJointChildren();
