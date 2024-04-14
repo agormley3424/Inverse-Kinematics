@@ -3,6 +3,8 @@
 
 #include "mat4d.h"
 #include "mat3d.h"
+#include "minivectorTemplate.h"
+#include <adolc/adolc.h>
 
 // a 4x4 row-major matrix representing an affine transformation
 // [ A t ]
@@ -33,6 +35,21 @@ public:
   inline RigidTransform4d(const Mat4d & mat) : AffineTransform4d(mat) {}
   inline RigidTransform4d(const AffineTransform4d & mat) : AffineTransform4d(mat) {}
   inline RigidTransform4d(const Mat3d & A, const Vec3d & t) : AffineTransform4d(A, t) {}
+  inline RigidTransform4d(Mat3<adouble>& A, const Vec3d& t)
+  {
+      for (int r = 0; r < 3; r++)
+      {
+          for (int c = 0; c < 3; c++)
+          {
+              elt[r][c] = A[r][c].getValue();
+          }
+      }
+
+      elt[0][3] = t[0];
+      elt[1][3] = t[1];
+      elt[2][3] = t[2];
+      elt[3] = Vec4d(0, 0, 0, 1);
+  }
 
   inline Mat3d getRotation() const { return AffineTransform4d::getLinearTrans(); }
 };

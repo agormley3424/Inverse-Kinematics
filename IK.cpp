@@ -18,7 +18,6 @@ using namespace std;
 
 namespace
 {
-
 // Converts degrees to radians.
 template<typename real>
 inline real deg2rad(real deg) { return deg * M_PI / 180.0; }
@@ -48,22 +47,13 @@ Mat3<real> Euler2Rotation(const real angle[3], RotateOrder order)
   assert(0);
 }
 
-template<typename real>
-Mat3d* Mat3ToMat3d(Mat3<real> templateMat)
+Mat3d* Mat3ToMat3d(Mat3<double> templateMat)
 {
-    if (std::is_same<double, real>::value)
-    {
-        double* convertedMatrix;
-        templateMat.convertToArray(convertedMatrix);
+    double* convertedMatrix;
+    templateMat.convertToArray(convertedMatrix);
 
-        return new Mat3d(convertedMatrix);
-    }
-    else
-    {
-        return nullptr;
-    }
+    return new Mat3d(convertedMatrix);
 }
-
 // Performs forward kinematics, using the provided "fk" class.
 // This is the function whose Jacobian matrix will be computed using adolc.
 // numIKJoints and IKJointIDs specify which joints serve as handles for IK:
@@ -88,25 +78,31 @@ void forwardKinematicsFunction(
     // I need to find the global transformation matrices for all handle joints at specified angles (eulerAngles)
     // Then transform the rest translation point of each handle with its corresponding joint matrix
 
+    ///// Compute global (local point to world) transforms for each joint /////
+
     int numJoints = fk.getNumJoints();
 
     RigidTransform4d* localTransforms = new RigidTransform4d[numJoints];
     RigidTransform4d* globalTransforms = new RigidTransform4d[numJoints];
 
+    // Overall joints
     for (int i = 0; i < numJoints; i++)
     {
-        Mat3<real> anat_incorrect_localR = Euler2Rotation(&eulerAngles.data()[i * 3], fk.getJointRotateOrder(i));
+        // Local rotations relative to 0 angles bind
+        Mat3<real> anat_incorrect_localR = Euler2Rotation<adouble>(&eulerAngles.data()[i * 3], fk.getJointRotateOrder(i));
 
-        Mat3<real> joint_orient = Euler2Rotation(&fk.getJointRestEulerAngles(i).data()[i * 3], fk.getJointRotateOrder(i));
+        // Joint orient mapping 
+        const double* eulerArray = fk.getJointRestEulerAngles(i).data();
+        real aEulerArray[3] = { eulerArray[0], eulerArray[1], eulerArray[2] };
+        Mat3<real> joint_orient = Euler2Rotation(aEulerArray, fk.getJointRotateOrder(i));
 
+        // Anatomically correct rotation
         Mat3<real> anat_correct_localR = anat_incorrect_localR * joint_orient;
-
-        Mat3d* converted_anat_correct_localR = Mat3ToMat3d(anat_correct_localR);
         
-        localTransforms[i] = RigidTransform4d(*converted_anat_correct_localR, fk.getJointRestTranslation(i));
+        // Combine rotation with translation from rest
+        localTransforms[i] = RigidTransform4d(anat_correct_localR, fk.getJointRestTranslation(i));
 
-        delete converted_anat_correct_localR;
-
+        // Calculate and store global transforms
         int parent_i = fk.getJointParent(i);
         if (parent_i >= 0)
         {
@@ -117,6 +113,8 @@ void forwardKinematicsFunction(
             globalTransforms[i] = localTransforms[i];
         }
     }
+
+    ///// Move every IK handle according to its global transform /////
 
     for (int i = 0; i < numIKJoints; i++)
     {
@@ -163,7 +161,7 @@ void IK::train_adolc()
     vector<adouble> inputs(FKInputDim);
     for (int i = 0; i < FKInputDim; i++)
     {
-        inputs[i] = 0.0;
+        inputs[i] <<= 0.0;
     }
 
     // Define function output
@@ -183,18 +181,83 @@ void IK::train_adolc()
     trace_off();
 }
 
+Eigen::MatrixXd VecArrToMatrix(const Vec3d* array, int rows, int cols)
+{
+    double* lin_targets = new double[cols * rows];
+
+    for (int i = 0; i < rows; i++)
+    {
+        array[i].convertToArray(&lin_targets[i * 3]);
+    }
+
+    double* arr_targets[] = { lin_targets };
+
+    delete[] lin_targets;
+
+    return Eigen::Map<Eigen::MatrixXd>(*arr_targets, rows, cols);
+}
+
 void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
 {
-  // You may find the following helpful:
-  int numJoints = fk->getNumJoints(); // Note that is NOT the same as numIKJoints!
+    // Students should implement this.
+    // Use adolc to evalute the forwardKinematicsFunction and its gradient (Jacobian). It was trained in train_adolc().
+    // Specifically, use ::function, and ::jacobian .
+    // See ADOLCExample.cpp .
+    //
+    // Use it implement the Tikhonov IK method (or the pseudoinverse method for extra credit).
+    // Note that at entry, "jointEulerAngles" contains the input Euler angles. 
+    // Upon exit, jointEulerAngles should contain the new Euler angles.
 
-  // Students should implement this.
-  // Use adolc to evalute the forwardKinematicsFunction and its gradient (Jacobian). It was trained in train_adolc().
-  // Specifically, use ::function, and ::jacobian .
-  // See ADOLCExample.cpp .
-  //
-  // Use it implement the Tikhonov IK method (or the pseudoinverse method for extra credit).
-  // Note that at entry, "jointEulerAngles" contains the input Euler angles. 
-  // Upon exit, jointEulerAngles should contain the new Euler angles.
+
+    int numJoints = fk->getNumJoints();
+
+
+    // Convert target handle positions to eigen format
+    Eigen::MatrixXd targetHandlePos = VecArrToMatrix(targetHandlePositions, numJoints, 3);
+
+    // Convert input euler angles to eigen format
+    Eigen::MatrixXd angles = VecArrToMatrix(jointEulerAngles, numJoints, 3);
+
+    // Create vector of zeros for last positions
+    Eigen::MatrixXd lastHandlePositions = Eigen::MatrixXd::Zero(numIKJoints, 3);
+
+    // Calculate jacobians
+    double* lin_jacobian = new double[FKInputDim * FKOutputDim];
+    double* arr_jacobian[] = { lin_jacobian };
+
+    ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, *jointEulerAngles, arr_jacobian);
+
+    Eigen::MatrixXd jacobian = Eigen::Map<Eigen::MatrixXd>(*arr_jacobian, FKOutputDim, FKInputDim);
+
+    Eigen::MatrixXd jacobian_T = jacobian.transpose();
+    Eigen::MatrixXd j_product = jacobian * jacobian_T;
+
+    // Calculate left matrix
+
+    double alpha = 0.001;
+
+    Eigen::MatrixXd identity = Eigen::Matrix2d::Identity(j_product.rows(), j_product.cols());
+    Eigen::MatrixXd left_matrix = j_product + (alpha * identity);
+
+    // Calculate right matrix
+
+    Eigen::MatrixXd handle_displacement = targetHandlePos - lastHandlePositions;
+    Eigen::MatrixXd right_matrix = jacobian_T * handle_displacement;
+
+    // Calculate new joints
+
+    Eigen::MatrixXd angle_displacement = left_matrix.colPivHouseholderQr().solve(right_matrix);
+    Eigen::MatrixXd new_angles = angles + angle_displacement;
+
+    double* lin_new_angles = new_angles.data();
+
+    for (int i = 0; i < numJoints; i++)
+    {
+        jointEulerAngles[i] = Vec3d(lin_new_angles[i * 3]);
+    }
+
+    // Clear memory
+
+    delete[] lin_jacobian;
 }
 
