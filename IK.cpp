@@ -78,6 +78,10 @@ void forwardKinematicsFunction(
     // I need to find the global transformation matrices for all handle joints at specified angles (eulerAngles)
     // Then transform the rest translation point of each handle with its corresponding joint matrix
 
+    // Angles are relative to the bind pose relative to the joint orientation
+    // When a multiply a point by the bind pose matrix it's now relative to the joint orientation
+    // When I multiply by the joint orientation matrix it's now relative to the world
+
     ///// Compute global (local point to world) transforms for each joint /////
 
     int numJoints = fk.getNumJoints();
@@ -192,9 +196,7 @@ Eigen::MatrixXd VecArrToMatrix(const Vec3d* array, int rows, int cols)
 
     double* arr_targets[] = { lin_targets };
 
-    delete[] lin_targets;
-
-    return Eigen::Map<Eigen::MatrixXd>(*arr_targets, rows, cols);
+    return Eigen::Map<Eigen::MatrixXd>(&arr_targets[0][0], rows, cols);
 }
 
 void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
@@ -208,56 +210,59 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     // Note that at entry, "jointEulerAngles" contains the input Euler angles. 
     // Upon exit, jointEulerAngles should contain the new Euler angles.
 
+    //Vec3d testArr[2];
+    //testArr[0] = { 0.2, 2.3, 1.4 };
+    //testArr[1] = { 3.6, 8.3, 7.2 };
+    //Eigen::MatrixXd testValue = VecArrToMatrix(testArr, 2, 3);
 
-    int numJoints = fk->getNumJoints();
-
+    //int numJoints = fk->getNumJoints();
 
     // Convert target handle positions to eigen format
-    Eigen::MatrixXd targetHandlePos = VecArrToMatrix(targetHandlePositions, numJoints, 3);
+    Eigen::VectorXd targetHandlePos = VecArrToMatrix(targetHandlePositions, numIKJoints * 3, 1);
 
-    // Convert input euler angles to eigen format
-    Eigen::MatrixXd angles = VecArrToMatrix(jointEulerAngles, numJoints, 3);
+    //// Convert input euler angles to eigen format
+    //Eigen::MatrixXd angles = VecArrToMatrix(jointEulerAngles, numJoints, 3);
 
-    // Create vector of zeros for last positions
-    Eigen::MatrixXd lastHandlePositions = Eigen::MatrixXd::Zero(numIKJoints, 3);
+    //// Create vector of zeros for last positions
+    //Eigen::VectorXd lastHandlePositions = Eigen::MatrixXd::Zero(numIKJoints * 3, 1);
 
-    // Calculate jacobians
-    double* lin_jacobian = new double[FKInputDim * FKOutputDim];
-    double* arr_jacobian[] = { lin_jacobian };
+    //// Calculate jacobians
+    //double** jacobian_array = new double* [FKOutputDim];
+    //for (int i = 0; i < FKOutputDim; i++)
+    //{
+    //    jacobian_array[i] = new double[FKInputDim];
+    //}
 
-    ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, *jointEulerAngles, arr_jacobian);
+    //::jacobian(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), jacobian_array);
 
-    Eigen::MatrixXd jacobian = Eigen::Map<Eigen::MatrixXd>(*arr_jacobian, FKOutputDim, FKInputDim);
+    //Eigen::MatrixXd jacobian = Eigen::Map<Eigen::MatrixXd>(*jacobian_array, FKOutputDim, FKInputDim);
 
-    Eigen::MatrixXd jacobian_T = jacobian.transpose();
-    Eigen::MatrixXd j_product = jacobian * jacobian_T;
+    //Eigen::MatrixXd jacobian_T = jacobian.transpose();
+    //Eigen::MatrixXd j_product = jacobian_T * jacobian;
 
-    // Calculate left matrix
+    //// Calculate left matrix
 
-    double alpha = 0.001;
+    //double alpha = 0.001;
 
-    Eigen::MatrixXd identity = Eigen::Matrix2d::Identity(j_product.rows(), j_product.cols());
-    Eigen::MatrixXd left_matrix = j_product + (alpha * identity);
+    //Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(j_product.rows(), j_product.cols());
+    //Eigen::MatrixXd left_matrix = j_product + (alpha * identity);
 
-    // Calculate right matrix
+    //// Calculate right matrix
 
-    Eigen::MatrixXd handle_displacement = targetHandlePos - lastHandlePositions;
-    Eigen::MatrixXd right_matrix = jacobian_T * handle_displacement;
+    //Eigen::VectorXd handle_displacement = targetHandlePos - lastHandlePositions;
+    //Eigen::MatrixXd right_matrix = jacobian_T * handle_displacement;
 
-    // Calculate new joints
+    //// Calculate new joints
 
-    Eigen::MatrixXd angle_displacement = left_matrix.colPivHouseholderQr().solve(right_matrix);
-    Eigen::MatrixXd new_angles = angles + angle_displacement;
+    //Eigen::VectorXd angle_displacement = left_matrix.colPivHouseholderQr().solve(right_matrix);
+    //Eigen::MatrixXd lin_angles = VecArrToMatrix(jointEulerAngles, numJoints * 3, 1);
+    //Eigen::VectorXd new_angles = lin_angles + angle_displacement;
 
-    double* lin_new_angles = new_angles.data();
+    //for (int i = 0; i < numJoints; i++)
+    //{
+    //    jointEulerAngles[i] = Vec3d(new_angles.data()[i * 3]);
+    //}
 
-    for (int i = 0; i < numJoints; i++)
-    {
-        jointEulerAngles[i] = Vec3d(lin_new_angles[i * 3]);
-    }
-
-    // Clear memory
-
-    delete[] lin_jacobian;
+    //delete[] jacobian_array;
 }
 
