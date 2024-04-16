@@ -215,12 +215,12 @@ void FK::computeLocalAndGlobalTransforms(
     for (int i = 0; i < localTransforms.size(); i++)
     {
         double anat_incorrect_localR[9];
-        euler2Rotation(jointOrientationEulerAngles[i], anat_incorrect_localR, rotateOrders[i]);
+        euler2Rotation(eulerAngles[i], anat_incorrect_localR, rotateOrders[i]);
 
         double joint_orient[9];
-        euler2Rotation(eulerAngles[i], joint_orient, rotateOrders[i]);
+        euler2Rotation(jointOrientationEulerAngles[i], joint_orient, rotateOrders[i]);
 
-        Mat3d anat_correct_localR = asMat3d(anat_incorrect_localR) * asMat3d(joint_orient);
+        Mat3d anat_correct_localR = asMat3d(joint_orient) * asMat3d(anat_incorrect_localR);
 
         localTransforms[i] = RigidTransform4d(anat_correct_localR, translations[i]);
 

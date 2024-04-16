@@ -39,6 +39,7 @@ protected:
   int adolc_tagID = 0; // tagID
   int FKInputDim = 0; // forward dynamics input dimension 
   int FKOutputDim = 0; // forward dynamics output dimension
+  bool printStuff = true;
 
   void train_adolc();
 };

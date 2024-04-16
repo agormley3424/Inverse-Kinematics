@@ -93,10 +93,10 @@ void forwardKinematicsFunction(
     for (int i = 0; i < numJoints; i++)
     {
         // Local rotations relative to 0 angles bind
-        Mat3<real> anat_incorrect_localR = Euler2Rotation<adouble>(&eulerAngles.data()[i * 3], fk.getJointRotateOrder(i));
+        Mat3<real> anat_incorrect_localR = Euler2Rotation<real>(&eulerAngles.data()[i * 3], fk.getJointRotateOrder(i));
 
         // Joint orient mapping 
-        const double* eulerArray = fk.getJointRestEulerAngles(i).data();
+        const double* eulerArray = fk.getJointOrient(i).data();
         real aEulerArray[3] = { eulerArray[0], eulerArray[1], eulerArray[2] };
         Mat3<real> joint_orient = Euler2Rotation(aEulerArray, fk.getJointRotateOrder(i));
 
@@ -232,18 +232,17 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     // Convert input euler angles to eigen format
     Eigen::MatrixXd angles = VecArrToMatrix(jointEulerAngles, numJoints, 3);
 
-    // Create vector of zeros for last positions
-    // Eigen::VectorXd lastHandlePositions = Eigen::MatrixXd::Zero(numIKJoints * 3, 1);
-    Eigen::VectorXd lastHandlePositions = Eigen::VectorXd(numIKJoints * 3);
+    // Calculate current IK handle positions (in the current frame)
+    Eigen::VectorXd currentHandlePositions(FKOutputDim);
+    ::function(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), currentHandlePositions.data());
 
-    for (int i = 0; i < numIKJoints; i++)
+    // Print current handles (for debugging)
+    cout << "Current handle positions: \n";
+    for (int i = 0; i < FKOutputDim; i++)
     {
-        int jointIndex = IKJointIDs[i];
-        Vec3d jointPos = fk->getJointGlobalPosition(jointIndex);
-        lastHandlePositions(i * 3) = jointPos[0];
-        lastHandlePositions((i * 3) + 1) = jointPos[1];
-        lastHandlePositions((i * 3) + 2) = jointPos[2];
+        cout << currentHandlePositions(i) << ', ';
     }
+    cout << endl;
 
     // Calculate jacobians
     double** jacobian_array = new double* [FKOutputDim];
@@ -255,6 +254,18 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), jacobian_array);
 
     Eigen::MatrixXd jacobian = Eigen::Map<Eigen::MatrixXd>(*jacobian_array, FKOutputDim, FKInputDim);
+
+    // Print jacobian (for debugging)
+    cout << "Jacobian Matrix:\n";
+    for (int r = 0; r < FKOutputDim; r++)
+    {
+        for (int c = 0; c < FKInputDim; c++)
+        {
+            cout << jacobian_array[r][c] << ' ';
+        }
+
+        cout << endl;
+    }
 
     Eigen::MatrixXd jacobian_T = jacobian.transpose();
     Eigen::MatrixXd j_product = jacobian_T * jacobian;
@@ -268,13 +279,10 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
 
     // Calculate right matrix
 
-    Eigen::VectorXd handle_displacement = targetHandlePos - lastHandlePositions;
+    Eigen::VectorXd handle_displacement = targetHandlePos - currentHandlePositions;
     Eigen::MatrixXd right_matrix = jacobian_T * handle_displacement;
 
     // Calculate new joints
-
-    // cout << "Left matrix: \n" << left_matrix;
-    // cout << "Right matrix: \n" << right_matrix;
 
     Eigen::VectorXd angle_displacement = left_matrix.colPivHouseholderQr().solve(right_matrix);
     Eigen::VectorXd lin_angles = VecArrToVector(jointEulerAngles, numJoints, 3);
@@ -283,7 +291,23 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     for (int i = 0; i < numJoints; i++)
     {
         jointEulerAngles[i] = Vec3d(new_angles.data()[i * 3]);
+
+        if (printStuff)
+        {
+            cout << jointEulerAngles[i] << endl;
+        }
     }
+
+    if (printStuff)
+    {
+        // cout << "Jacobian: \n" << jacobian << endl;
+        // cout << "Left matrix: \n" << left_matrix;
+        // cout << "Handle displacement: \n" << handle_displacement << endl;
+        // cout << "Right matrix: \n" << right_matrix;
+    }
+
+
+    printStuff = false;
 
     delete[] jacobian_array;
 }
