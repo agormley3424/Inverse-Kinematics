@@ -54,6 +54,91 @@ Mat3d* Mat3ToMat3d(Mat3<double> templateMat)
 
     return new Mat3d(convertedMatrix);
 }
+
+template <typename real>
+void PrintArrayAsMatrix(real* mat, string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < 3; r++)
+    {
+        for (int c = 0; c < 3; c++)
+        {
+            cout << mat[(r * 3) + c] << ", ";
+        }
+        cout << endl;
+    }
+}
+
+template <typename real>
+void PrintArrayAsVector(real* vec, string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < 3; r++)
+    {
+        cout << vec[r] << ", ";
+    }
+    cout << endl;
+}
+
+template <typename real>
+void PrintMatrix(Mat3<real> mat, string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < 3; r++)
+    {
+        for (int c = 0; c < 3; c++)
+        {
+            cout << mat[r][c] << ", ";
+        }
+        cout << endl;
+    }
+}
+
+void PrintMatrix(Mat3d mat, string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < 3; r++)
+    {
+        for (int c = 0; c < 3; c++)
+        {
+            cout << mat[r][c] << ", ";
+        }
+        cout << endl;
+    }
+}
+
+void PrintVector(Vec3d vec, string name)
+{
+    cout << name << ":\n";
+    for (int i = 0; i < 3; i++)
+    {
+        cout << vec[i] << ", ";
+    }
+    cout << endl;
+}
+
+template <typename real>
+void PrintVector(Vec3<real> vec, string name)
+{
+    cout << name << ":\n";
+    for (int i = 0; i < 3; i++)
+    {
+        cout << vec[i] << ", ";
+    }
+    cout << endl;
+}
+
+template <typename real>
+Vec3<real> Vec3DToVec3(const Vec3d vec)
+{
+    Vec3<real> returnVec;
+
+    returnVec[0] = vec[0];
+    returnVec[1] = vec[1];
+    returnVec[2] = vec[2];
+
+    return returnVec;
+}
 // Performs forward kinematics, using the provided "fk" class.
 // This is the function whose Jacobian matrix will be computed using adolc.
 // numIKJoints and IKJointIDs specify which joints serve as handles for IK:
@@ -86,35 +171,58 @@ void forwardKinematicsFunction(
 
     int numJoints = fk.getNumJoints();
 
-    RigidTransform4d* localTransforms = new RigidTransform4d[numJoints];
-    RigidTransform4d* globalTransforms = new RigidTransform4d[numJoints];
+    //RigidTransform4d* localTransforms = new RigidTransform4d[numJoints];
+    //RigidTransform4d* globalTransforms = new RigidTransform4d[numJoints];
+
+    Vec3<real>* localTranslations = new Vec3<real>[numJoints];
+    Mat3<real>* localRotations = new Mat3<real>[numJoints];
+    Vec3<real>* globalTranslations = new Vec3<real>[numJoints];
+    Mat3<real>* globalRotations = new Mat3<real>[numJoints];
 
     // Overall joints
     for (int i = 0; i < numJoints; i++)
     {
-        // Local rotations relative to 0 angles bind
-        Mat3<real> anat_incorrect_localR = Euler2Rotation<real>(&eulerAngles.data()[i * 3], fk.getJointRotateOrder(i));
+        int currentJointIndex = fk.getJointUpdateOrder(i);
 
-        // Joint orient mapping 
-        const double* eulerArray = fk.getJointOrient(i).data();
+        // Local rotations relative to 0 angles bind
+        Mat3<real> anat_incorrect_localR = Euler2Rotation<real>(&eulerAngles.data()[i * 3], fk.getJointRotateOrder(currentJointIndex));
+
+        // PrintMatrix(anat_incorrect_localR, "Anat incorrect matrix");
+
+        // Joint orient mapping
+        const double* eulerArray = fk.getJointOrient(currentJointIndex).data();
         real aEulerArray[3] = { eulerArray[0], eulerArray[1], eulerArray[2] };
-        Mat3<real> joint_orient = Euler2Rotation(aEulerArray, fk.getJointRotateOrder(i));
+        Mat3<real> joint_orient = Euler2Rotation(aEulerArray, fk.getJointRotateOrder(currentJointIndex));
+
+        // PrintMatrix(joint_orient, "Joint orient");
 
         // Anatomically correct rotation
-        Mat3<real> anat_correct_localR = anat_incorrect_localR * joint_orient;
+        Mat3<real> anat_correct_localR = joint_orient * anat_incorrect_localR;
+
+        // PrintMatrix(anat_correct_localR, "Local Rotation Matrix");
+        //PrintVector(fk.getJointRestTranslation(currentJointIndex), "Translation Vector");
         
         // Combine rotation with translation from rest
-        localTransforms[i] = RigidTransform4d(anat_correct_localR, fk.getJointRestTranslation(i));
+        //localTransforms[currentJointIndex] = RigidTransform4d(anat_correct_localR, fk.getJointRestTranslation(currentJointIndex));
+        localTranslations[currentJointIndex] = Vec3DToVec3<real>(fk.getJointRestTranslation(currentJointIndex));
+        localRotations[currentJointIndex] = anat_correct_localR;
+
+        //PrintMatrix(localTransforms[currentJointIndex].getRotation(), "Local Rotation Matrix");
+        //PrintVector(localTransforms[currentJointIndex].getTranslation(), "Local Translation Vector");
 
         // Calculate and store global transforms
-        int parent_i = fk.getJointParent(i);
+        int parent_i = fk.getJointParent(currentJointIndex);
         if (parent_i >= 0)
         {
-            globalTransforms[i] = globalTransforms[parent_i] * localTransforms[i];
+            // globalTransforms[currentJointIndex] = globalTransforms[parent_i] * localTransforms[currentJointIndex];
+            globalRotations[currentJointIndex] = globalRotations[parent_i] * localRotations[currentJointIndex];
+            globalTranslations[currentJointIndex] = (globalRotations[parent_i] * localTranslations[currentJointIndex]) + globalTranslations[parent_i];
         }
         else
         {
-            globalTransforms[i] = localTransforms[i];
+            // globalTransforms[currentJointIndex] = localTransforms[currentJointIndex];
+            globalTranslations[currentJointIndex] = localTranslations[currentJointIndex];
+            globalRotations[currentJointIndex] = localRotations[currentJointIndex];
         }
     }
 
@@ -123,14 +231,23 @@ void forwardKinematicsFunction(
     for (int i = 0; i < numIKJoints; i++)
     {
         int jointIndex = IKJointIDs[i];
-        Vec3d newPoint = globalTransforms[jointIndex].transformPoint(fk.getJointRestTranslation(jointIndex));
+        // Vec3d newPoint = globalTransforms[jointIndex].transformPoint(fk.getJointRestTranslation(jointIndex));
+        Vec3<real> newPoint = globalTranslations[jointIndex];
         handlePositions[i * 3] = newPoint[0];
         handlePositions[(i * 3) + 1] = newPoint[1];
         handlePositions[(i * 3) + 2] = newPoint[2];
+
+        // handlePositions[i * 3] = 1.0;
+
+        // PrintArrayAsVector(&handlePositions[i], "Handle position");
+
+        // int j = 1;
     }
 
-    delete[] localTransforms;
-    delete[] globalTransforms;
+    delete[] localRotations;
+    delete[] localTranslations;
+    delete[] globalTranslations;
+    delete[] globalRotations;
 }
 
 } // end anonymous namespaces
@@ -169,7 +286,7 @@ void IK::train_adolc()
     }
 
     // Define function output
-    vector<adouble> func_out = vector<adouble>(FKOutputDim);
+    vector<adouble> func_out(FKOutputDim);
 
     // Define and record function
     forwardKinematicsFunction(numIKJoints, IKJointIDs, *fk, inputs, func_out);
@@ -240,7 +357,7 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     cout << "Current handle positions: \n";
     for (int i = 0; i < FKOutputDim; i++)
     {
-        cout << currentHandlePositions(i) << ', ';
+        cout << currentHandlePositions(i) << ", ";
     }
     cout << endl;
 
@@ -300,15 +417,20 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
 
     if (printStuff)
     {
-        // cout << "Jacobian: \n" << jacobian << endl;
-        // cout << "Left matrix: \n" << left_matrix;
-        // cout << "Handle displacement: \n" << handle_displacement << endl;
-        // cout << "Right matrix: \n" << right_matrix;
+         cout << "Jacobian: \n" << jacobian << endl;
+         cout << "Left matrix: \n" << left_matrix;
+         cout << "Handle displacement: \n" << handle_displacement << endl;
+         cout << "Right matrix: \n" << right_matrix;
     }
 
 
     printStuff = false;
 
+    // Deallocate heap memory
+    for (int i = 0; i < FKOutputDim; i++)
+    {
+        delete[] jacobian_array[i];
+    }
     delete[] jacobian_array;
 }
 

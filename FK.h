@@ -80,6 +80,8 @@ public:
   const std::vector<int> & getJointChildren(int jointID) const { return jointChildren[jointID]; }
   // The returned joints are sorted (ascending order).
   std::vector<int> getJointDescendents(int jointID) const;
+  static void PrintMatrix(Mat3d mat, std::string name);
+  static void PrintArrayAsMatrix(double* mat, std::string name);
   // Get the joint that appears at position "index" in a linear joint update order. This order is established
   // in the constructor. When one traverses the hierarchy in this order, children are guaranteed to appear after
   // the parents. So, when performing forward kinematics, you can use this order to guarantee that

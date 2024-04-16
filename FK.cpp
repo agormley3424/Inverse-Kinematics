@@ -186,6 +186,32 @@ vector<int> FK::getJointDescendents(int jointID) const
   return ret;
 }
 
+void FK::PrintMatrix(Mat3d mat, std::string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < 3; r++)
+    {
+        for (int c = 0; c < 3; c++)
+        {
+            cout << mat[r][c] << ", ";
+        }
+        cout << endl;
+    }
+}
+
+void FK::PrintArrayAsMatrix(double* mat, std::string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < 3; r++)
+    {
+        for (int c = 0; c < 3; c++)
+        {
+            cout << mat[(r * 3) + c] << ", ";
+        }
+        cout << endl;
+    }
+}
+
 // This is the main function that performs forward kinematics.
 // Each joint has its local transformation relative to the parent joint. 
 // globalTransform of a joint is the transformation that converts a point expressed in the joint's local frame of reference, to the world coordinate frame.
@@ -214,24 +240,30 @@ void FK::computeLocalAndGlobalTransforms(
 
     for (int i = 0; i < localTransforms.size(); i++)
     {
+        int currentJointIndex = jointUpdateOrder[i];
+
         double anat_incorrect_localR[9];
-        euler2Rotation(eulerAngles[i], anat_incorrect_localR, rotateOrders[i]);
+        euler2Rotation(eulerAngles[currentJointIndex], anat_incorrect_localR, rotateOrders[currentJointIndex]);
+
+        // PrintArrayAsMatrix(anat_incorrect_localR, "Anat incorrect matrix");
 
         double joint_orient[9];
-        euler2Rotation(jointOrientationEulerAngles[i], joint_orient, rotateOrders[i]);
+        euler2Rotation(jointOrientationEulerAngles[currentJointIndex], joint_orient, rotateOrders[currentJointIndex]);
+
+        // PrintArrayAsMatrix(joint_orient, "Joint Orient");
 
         Mat3d anat_correct_localR = asMat3d(joint_orient) * asMat3d(anat_incorrect_localR);
 
-        localTransforms[i] = RigidTransform4d(anat_correct_localR, translations[i]);
+        localTransforms[currentJointIndex] = RigidTransform4d(anat_correct_localR, translations[currentJointIndex]);
 
-        int parent_i = jointParents[i];
+        int parent_i = jointParents[currentJointIndex];
         if (parent_i >= 0)
         {
-            globalTransforms[i] = globalTransforms[parent_i] * localTransforms[i];
+            globalTransforms[currentJointIndex] = globalTransforms[parent_i] * localTransforms[currentJointIndex];
         }
         else
         {
-            globalTransforms[i] = localTransforms[i];
+            globalTransforms[currentJointIndex] = localTransforms[currentJointIndex];
         }
     }
 }
