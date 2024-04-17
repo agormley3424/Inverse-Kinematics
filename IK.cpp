@@ -1,4 +1,4 @@
-#include "IK.h"
+﻿#include "IK.h"
 #include "FK.h"
 #include "minivectorTemplate.h"
 #include <Eigen/Dense>
@@ -105,6 +105,29 @@ void PrintMatrix(Mat3d mat, string name)
             cout << mat[r][c] << ", ";
         }
         cout << endl;
+    }
+}
+
+void PrintMatrix(Eigen::MatrixXd mat, string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < mat.rows(); r++)
+    {
+        for (int c = 0; c < mat.cols(); c++)
+        {
+            cout << mat(r, c) << ' ';
+        }
+
+        cout << endl;
+    }
+}
+
+void PrintVector(Eigen::VectorXd vec, string name)
+{
+    cout << name << ":\n";
+    for (int r = 0; r < vec.rows(); r++)
+    {
+        cout << vec(r) << endl;
     }
 }
 
@@ -373,20 +396,6 @@ void IK::train_adolc()
     trace_off();
 }
 
-Eigen::MatrixXd VecArrToMatrix(const Vec3d* array, int rows, int cols)
-{
-    double* lin_targets = new double[cols * rows];
-
-    for (int i = 0; i < rows; i++)
-    {
-        array[i].convertToArray(&lin_targets[i * 3]);
-    }
-
-    double* arr_targets[] = { lin_targets };
-
-    return Eigen::Map<RowMajorMatrix>(&arr_targets[0][0], rows, cols);
-}
-
 Eigen::MatrixXd ArrToMatrix(double* array[], int rows, int cols)
 {
     Eigen::MatrixXd returnMatrix(rows, cols);
@@ -406,17 +415,30 @@ Eigen::MatrixXd ArrToMatrix(double* array[], int rows, int cols)
 
 Eigen::VectorXd VecArrToVector(const Vec3d* array, int cols, int rows)
 {
-    double* lin_targets = new double[cols * rows];
+    //double* lin_targets = new double[cols * rows];
 
-    for (int i = 0; i < rows; i++)
-    {
-        array[i].convertToArray(&lin_targets[i * 3]);
-    }
+    //for (int i = 0; i < rows; i++)
+    //{
+    //    array[i].convertToArray(&lin_targets[i * 3]);
+    //}
 
-    double* arr_targets[] = { lin_targets };
+    //double* arr_targets[] = { lin_targets };
 
-    return Eigen::Map<Eigen::VectorXd>(&arr_targets[0][0], rows * cols);
+    //return Eigen::Map<Eigen::VectorXd>(&arr_targets[0][0], rows * cols);
+
+    // return Eigen::Map<Eigen::VectorXd>(array->data(), rows, cols);
+
+    return Eigen::Map<const Eigen::VectorXd>(&array[0][0], cols * rows);
 }
+
+//unsigned int vecSize = cols * rows;
+//
+//Eigen::VectorXd vec(vecSize);
+//
+//for (int i = 0; i < vecSize; i++)
+//{
+//    vec(i)
+//}
 
 void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
 {
@@ -432,44 +454,16 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     int numJoints = fk->getNumJoints();
 
     // Convert target handle positions to eigen format
+    // Eigen::VectorXd targetHandlePos = VecArrToVector(targetHandlePositions, numIKJoints, 3);
     Eigen::VectorXd targetHandlePos = VecArrToVector(targetHandlePositions, numIKJoints, 3);
 
     // Convert input euler angles to eigen format
-    Eigen::MatrixXd angles = VecArrToMatrix(jointEulerAngles, numJoints, 3);
-
-    cout << "Array Angles:\n";
-    for (int r = 0; r < numJoints; r++)
-    {
-        for (int c = 0; c < 3; c++)
-        {
-            cout << jointEulerAngles[r][c] << ' ';
-        }
-
-        cout << endl;
-    }
-
-    cout << "Eigen Angles:\n";
-    for (int r = 0; r < numJoints; r++)
-    {
-        for (int c = 0; c < 3; c++)
-        {
-            cout << angles(r, c) << ' ';
-        }
-
-        cout << endl;
-    }
+    // Eigen::MatrixXd angles = VecArrToMatrix(jointEulerAngles, numJoints, 3);
+    Eigen::VectorXd angles = VecArrToVector(jointEulerAngles, numJoints, 3);
 
     // Calculate current IK handle positions (in the current frame)
     Eigen::VectorXd currentHandlePositions(FKOutputDim);
-    ::function(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), currentHandlePositions.data());
-
-    // Print current handles (for debugging)
-    //cout << "Current handle positions: \n";
-    //for (int i = 0; i < FKOutputDim; i++)
-    //{
-    //    cout << currentHandlePositions(i) << ", ";
-    //}
-    //cout << endl;
+    ::function(adolc_tagID, FKOutputDim, FKInputDim, jointEulerAngles->data(), currentHandlePositions.data());
 
     // Calculate jacobians
     double** jacobian_array = new double* [FKOutputDim];
@@ -479,7 +473,7 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     }
 
     /* I could use the .data field of a 2D eigen matrix for the output of this */
-    ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), jacobian_array);
+    ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, jointEulerAngles->data(), jacobian_array);
 
     Eigen::MatrixXd jacobian = ArrToMatrix(jacobian_array, FKOutputDim, FKInputDim);
 
@@ -488,30 +482,6 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     // Eigen::MatrixXd jacobian_T = Eigen::Map<Eigen::MatrixXd>(*jacobian_array, FKInputDim, FKOutputDim);
 
     Eigen::MatrixXd jacobian_T = jacobian.transpose();
-
-    cout << "Array Jacobian Matrix:\n";
-    for (int r = 0; r < FKOutputDim; r++)
-    {
-        for (int c = 0; c < FKInputDim; c++)
-        {
-            cout << jacobian_array[r][c] << ' ';
-        }
-
-        cout << endl;
-    }
-
-    // Print jacobian (for debugging)
-    cout << "Eigen Jacobian Matrix:\n";
-    for (int r = 0; r < jacobian.rows(); r++)
-    {
-        for (int c = 0; c < jacobian.cols(); c++)
-        {
-            cout << jacobian(r, c) << ' ';
-        }
-
-        cout << endl;
-    }
-
     Eigen::MatrixXd j_product = jacobian_T * jacobian;
 
     // Calculate left matrix
@@ -521,43 +491,30 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(j_product.rows(), j_product.cols());
     Eigen::MatrixXd left_matrix = j_product + (alpha * identity);
 
+    // PrintMatrix(left_matrix, "Left Matrix");
+
     // Calculate right matrix
 
     Eigen::VectorXd handle_displacement = targetHandlePos - currentHandlePositions;
     Eigen::VectorXd right_matrix = jacobian_T * handle_displacement;
 
+    //PrintVector(handle_displacement, "Handle displacement");
+
+    //PrintMatrix(right_matrix, "Right Matrix");
+
     // Calculate new joints
 
     Eigen::VectorXd angle_displacement = left_matrix.ldlt().solve(right_matrix);
-    Eigen::VectorXd lin_angles = VecArrToVector(jointEulerAngles, numJoints, 3);
-    Eigen::VectorXd new_angles = lin_angles + angle_displacement;
+    Eigen::VectorXd new_angles = angles + angle_displacement;
+
+    //PrintVector(angles, "Original angles");
+    //PrintVector(angle_displacement, "Angle displacement");
+    //PrintVector(new_angles, "New angles");
 
     for (int i = 0; i < numJoints; i++)
     {
-        jointEulerAngles[i] = Vec3d(new_angles.data()[i * 3]);
-
-        if (printStuff)
-        {
-            // cout << jointEulerAngles[i] << endl;
-        }
+        jointEulerAngles[i] = Vec3d(&new_angles.data()[i * 3]);
     }
-
-    if (printStuff)
-    {
-         //cout << "Left matrix: \n" << left_matrix;
-         //cout << "Handle displacement: \n" << handle_displacement << endl;
-         //cout << "Right matrix: \n" << right_matrix;
-
-        cout << "New angles\n";
-        for (int i = 0; i < numJoints; i++)
-        {
-            cout << jointEulerAngles[i];
-        }
-        cout << endl;
-    }
-
-
-    printStuff = false;
 
     // Deallocate heap memory
     for (int i = 0; i < FKOutputDim; i++)
@@ -566,4 +523,3 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     }
     delete[] jacobian_array;
 }
-
