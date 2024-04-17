@@ -1,1 +1,0 @@
-Figure out why the jacobian is 0 (best guess is that ADOL-C isn't happy about me converting between doubles and adoubles)

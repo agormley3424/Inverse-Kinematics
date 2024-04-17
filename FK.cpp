@@ -281,17 +281,6 @@ void FK::computeSkinningTransforms(
     {
         skinTransforms[i] = globalTransforms[i] * invRestGlobalTransforms[i];
     }
-
-  // The following is just a dummy implementation that should be replaced.
-  //double identity[16] = {
-  //  1, 0, 0, 0,
-  //  0, 1, 0, 0,
-  //  0, 0, 1, 0,
-  //  0, 0, 0, 1 };
-  //for(int i=0; i<skinTransforms.size(); i++)
-  //{
-  //  skinTransforms[i] = RigidTransform4d(identity);
-  //}
 }
 
 void FK::computeJointTransforms()

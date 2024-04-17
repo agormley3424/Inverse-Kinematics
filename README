@@ -1,0 +1,22 @@
+This program is a showcase of an inverse kinematics / skinning system.
+
+computeLocalAndGlobalTransforms, a method of the FK class, computes global (joint space to world space) transformation
+matrices for every joint. It does this by computing the root's global transformation from its orientation, then
+sequentially computing the matrices of its descendents, and then their descendents. Every rotation is a
+composite transformation of two matrices, the first transforming points from space relative to
+parent angle relative to rest into space relative to rest, and the second mapping from space relative to rest
+to space relative to anatomically correct resting joint angles (the joint orient).
+
+These transformations are used to display the joint hierarchy of the object, highlight descendents of a given joint, and show arrows for IK handles, and used for skinning. computeSkinningTransforms takes fragments on the skin
+(specified in world space), transforms them into joint space with the inverse global transformation, then
+transforms them back into world space, but adjusted for where the joints are now posed.
+
+forwardKinematicsFunction, a member of IK, is similar to computeLocalAndGlobalTransforms. It computes local and
+global transformations for every joint, but only saves those needed for the IK handle joints. This process is
+differentiated via ADOL-C in the train_adolc method. This method treats the angles of all joints as input, and the
+resulting positions of the kinematic handles as output. doIK performs Tikhonov regularization by solving the system
+of linear equations ((J^T)J + aI)DO = (J^T)Db. J is the jacobian of the forward kinematics function described above,
+alpha is a regularization parameter (which I set at 0.001), Db is the displacement between the final IK handle positions and their position on the frame (this function is called in), and DO is the vector of angle displacements,
+the difference between the initial and final orientations of each joint in this frame. DO is solved for,
+treating this as a system of linear equations. The Eigen library is used to solve the system and perform
+basic linear algebra functionality, albeit with great difficulty (column-major matrices? No direct conversions to C arrays?????). Once the angle displacements are found, they're added to the known angles and the joints are moved.

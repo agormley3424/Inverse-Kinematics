@@ -90,6 +90,12 @@
     <ClCompile Include="..\skeletonRenderer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\pic.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ppm.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\minivectorTemplate.h">
@@ -196,6 +202,12 @@
     </ClInclude>
     <ClInclude Include="..\vega\transform4d.h">
       <Filter>Vega</Filter>
+    </ClInclude>
+    <ClInclude Include="..\pic.h">
+      <Filter>Source Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\ppm.h">
+      <Filter>Source Files</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

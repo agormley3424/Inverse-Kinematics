@@ -20,6 +20,8 @@
 #include "IK.h"
 #include "handleControl.h"
 #include "skeletonRenderer.h"
+#include "ppm.h"
+#include "pic.h"
 #ifdef WIN32
   #include <windows.h>
 #endif
@@ -48,6 +50,8 @@ static bool showAxes = false;
 static bool showWireframe = true;
 static bool showObject = true;
 static bool useLighting = true;
+static bool recordScreenshots = false;
+static unsigned int screenshotCount = 1;
 static double allLightsIntensity = 1.0;
 
 static Vec3d modelCenter(0.0);
@@ -157,6 +161,37 @@ static void idleFunction()
   }
   graphicsFrameID++;
   glutPostRedisplay();
+
+  if (recordScreenshots)
+  {
+      int windowWidth = 800;
+      int windowHeight = 800;
+      char filename[100];
+      sprintf(filename, "../pics/pic%i.ppm", screenshotCount);
+
+      if (filename == NULL)
+          return;
+
+      // Allocate a picture buffer 
+      Pic* in = pic_alloc(windowWidth, windowHeight, 3, NULL);
+
+      printf("File to save to: %s\n", filename);
+
+      for (int i = windowHeight - 1; i >= 0; i--)
+      {
+          glReadPixels(0, windowHeight - i - 1, windowWidth, 1, GL_RGB, GL_UNSIGNED_BYTE,
+              &in->pix[i * in->nx * in->bpp]);
+      }
+
+      if (ppm_write(filename, in))
+          printf("File saved Successfully\n");
+      else
+          printf("Error in Saving\n");
+
+      pic_free(in);
+
+      ++screenshotCount;
+  }
 }
 
 static void reshape(int x, int y)
@@ -321,6 +356,10 @@ static void keyboardFunc(unsigned char key, int x, int y)
     case 's':
       renderSkeleton = !renderSkeleton;
       break;
+
+    case ' ':
+        recordScreenshots = !recordScreenshots;
+        break;
 
     default:
       break;
