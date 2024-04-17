@@ -463,7 +463,7 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
 
     // Calculate current IK handle positions (in the current frame)
     Eigen::VectorXd currentHandlePositions(FKOutputDim);
-    ::function(adolc_tagID, FKOutputDim, FKInputDim, jointEulerAngles->data(), currentHandlePositions.data());
+    ::function(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), currentHandlePositions.data());
 
     // Calculate jacobians
     double** jacobian_array = new double* [FKOutputDim];
@@ -473,7 +473,7 @@ void IK::doIK(const Vec3d * targetHandlePositions, Vec3d * jointEulerAngles)
     }
 
     /* I could use the .data field of a 2D eigen matrix for the output of this */
-    ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, jointEulerAngles->data(), jacobian_array);
+    ::jacobian(adolc_tagID, FKOutputDim, FKInputDim, angles.data(), jacobian_array);
 
     Eigen::MatrixXd jacobian = ArrToMatrix(jacobian_array, FKOutputDim, FKInputDim);
 
