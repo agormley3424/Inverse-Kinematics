@@ -20,3 +20,9 @@ alpha is a regularization parameter (which I set at 0.001), Db is the displaceme
 the difference between the initial and final orientations of each joint in this frame. DO is solved for,
 treating this as a system of linear equations. The Eigen library is used to solve the system and perform
 basic linear algebra functionality, albeit with great difficulty (column-major matrices? No direct conversions to C arrays?????). Once the angle displacements are found, they're added to the known angles and the joints are moved.
+
+To add the ability for screenshotting and recording videos, I added the pic.cpp and ppm.cpp files
+from the mass-spring system and attached a screenshot generator to the end of the idleFunction that GLUT
+calls every frame. I hooked up an event handler for the space bar to toggle recording using this.
+
+The executable can be found as VS2017/x64/Debug/IK.exe.
